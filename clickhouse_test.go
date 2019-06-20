@@ -1346,3 +1346,55 @@ func Test_LikeQuery(t *testing.T) {
 		}
 	}
 }
+
+func TestArrayNullableT(t *testing.T) {
+	const (
+		ddl = `
+			CREATE TABLE clickhouse_test_array_nullable_t (
+				String Array(Nullable(String))
+			) Engine=Memory
+		`
+		dml = `
+			INSERT INTO clickhouse_test_array_nullable_t (String) VALUES (?)
+		`
+		query = `
+			SELECT
+				String
+			FROM clickhouse_test_array_nullable_t
+		`
+	)
+	if connect, err := sql.Open("clickhouse", "tcp://127.0.0.1:9000?debug=true"); assert.NoError(t, err) && assert.NoError(t, connect.Ping()) {
+		if _, err := connect.Exec("DROP TABLE IF EXISTS clickhouse_test_array_nullable_t"); assert.NoError(t, err) {
+			if _, err := connect.Exec(ddl); assert.NoError(t, err) {
+				if tx, err := connect.Begin(); assert.NoError(t, err) {
+					if stmt, err := tx.Prepare(dml); assert.NoError(t, err) {
+						_, err = stmt.Exec(
+							[]*string{},
+						)
+						if !assert.NoError(t, err) {
+							return
+						}
+						_, err = stmt.Exec(
+							[]*string{nil},
+						)
+						if !assert.NoError(t, err) {
+							return
+						}
+					} else {
+						return
+					}
+					if assert.NoError(t, tx.Commit()) {
+						/*	var value []string
+							if err := connect.QueryRow(query).Scan(&value); assert.NoError(t, err) {
+								if !assert.NoError(t, err) {
+									return
+								}
+							}
+							assert.Equal(t, []string{"A", "C"}, value)
+						*/
+					}
+				}
+			}
+		}
+	}
+}
